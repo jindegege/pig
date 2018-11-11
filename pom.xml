@@ -109,7 +109,6 @@
         <module>pig-eureka</module>
         <module>pig-gateway</module>
         <module>pig-modules</module>
-        <module>pig-visual</module>
     </modules>
 
     <dependencyManagement>
