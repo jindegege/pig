@@ -1,46 +1,101 @@
 version: '2'
 services:
-  pig-eureka:
+  ics-mysql: 
+    restart: always
+    build:
+      context: ./
+      dockerfile: Dockerfile
+    container_name: ics-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: admin
+    ports:
+      - 3306:3306
+    volumes:
+     - /opt/mysql_data:/var/lib/mysql
+     - /mysql/conf/mysqld.cnf:/etc/mysql/mysql.conf.d/mysqld.cnf
+    networks:
+      - ics-net
+
+  ics-redis:
+    restart: always
+    build:
+      context: ./
+      dockerfile: Dockerfile-redis
+    container_name: ics-redis
+    ports:
+      - 6379:6379
+    networks:
+      - ics-net
+ 
+  ics-discovery-service:
     build:
       context: ./
       dockerfile: Dockerfile-eureka
+    container_name: ics-eureka
     restart: always
     ports:
-      - 1025:1025
+      - 9010:9010
+    hostname: discovery
+    networks:
+      - ics-net
 
-  pig-config:
+  ics-auth-service:
     links:
-      - pig-eureka:eureka
-    build:
-      context: ./
-      dockerfile: Dockerfile-config
-    restart: always
-
-  pig-gateway:
-    links:
-      - pig-eureka:eureka
-      - pig-auth:auth
-    build:
-      context: ./
-      dockerfile: Dockerfile-gateway
-    restart: always
-    ports:
-      - 9999:9999
-
-  pig-auth:
-    links:
-      - pig-eureka:eureka
+      - ics-discovery-service:discovery
+      - ics-mysql:mysql
+      - ics-redis:redis
     build:
       context: ./
       dockerfile: Dockerfile-auth
+    container_name: ics-auth
     restart: always
     ports:
-      - 3000:3000
+      - 9060:9060
+    networks:
+      - ics-net
 
-  pig-upms-service:
+  ics-site-service-provider:
     links:
-      - pig-eureka:eureka
+      - ics-discovery-service:discovery
+      - ics-mysql:mysql
+      - ics-redis:redis
     build:
       context: ./
-      dockerfile: Dockerfile-upms
+      dockerfile: Dockerfile-site
+    container_name: ics-site
     restart: always
+    ports:
+      - 8001:8001
+    networks:
+      - ics-net
+
+  ics-edge-service:
+    links:
+      - ics-discovery-service:discovery
+      - ics-auth-service:auth
+    container_name: ics_gateway
+    build:
+      context: ./
+      dockerfile: Dockerfile-gateway
+    ports:
+      - 9030:9030
+    networks:
+      - ics-net
+
+  ics-user-service:
+    links:
+      - ics-discovery-service:discovery
+      - ics-mysql:mysql
+    container_name: ics_user
+    build:
+      context: ./
+      dockerfile: Dockerfile-user
+    restart: always
+    ports:
+      - 8006:8006
+    networks:
+      - ics-net
+
+networks:
+  ics-net:
+    driver: bridge
