@@ -2,6 +2,6 @@ FROM java:8-jre
 MAINTAINER Pig lengleng <wangiegie@gmail.com>
 
 ADD ./jar/ics-auth-service.jar /app/
-CMD ["java", "-Xmx500m", "-jar", "/app/ics-auth-service.jar"]
+CMD ["java", "-Xmx500m", "-jar", "/app/pig-auth-service.jar"]
 
-# ENTRYPOINT ["java","-jar","/app/ics-auth-service.jar"]
+# ENTRYPOINT ["java","-jar","/app/pig-auth-service.jar"]
