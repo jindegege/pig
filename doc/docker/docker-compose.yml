@@ -1,11 +1,11 @@
-version: '2'
+version: '3'
 services:
-  ics-mysql: 
+  pig-mysql:
     restart: always
     build:
       context: ./
       dockerfile: Dockerfile
-    container_name: ics-mysql
+    container_name: pig-mysql
     environment:
       MYSQL_ROOT_PASSWORD: admin
     ports:
@@ -14,88 +14,134 @@ services:
      - /opt/mysql_data:/var/lib/mysql
      - /mysql/conf/mysqld.cnf:/etc/mysql/mysql.conf.d/mysqld.cnf
     networks:
-      - ics-net
+      - pig-net
 
-  ics-redis:
+  pig-redis:
     restart: always
     build:
       context: ./
       dockerfile: Dockerfile-redis
-    container_name: ics-redis
+    container_name: pig-redis
     ports:
       - 6379:6379
     networks:
-      - ics-net
+      - pig-net
+
+  pig-rabbitmq:
+     image: rabbitmq:alpine
+     container_name: pig-rabbitmq
+     restart: always
+     volumes:
+       - ./data/rabbitmq:/var/lib/rabbitmq
+     networks:
+       - pig-net
+     ports:
+       - 5672:5672
  
-  ics-discovery-service:
+  pig-eureka:
     build:
       context: ./
       dockerfile: Dockerfile-eureka
     container_name: ics-eureka
     restart: always
     ports:
-      - 9010:9010
+      - 1025:1025
     hostname: discovery
     networks:
-      - ics-net
+      - pig-net
 
-  ics-auth-service:
-    links:
-      - ics-discovery-service:discovery
-      - ics-mysql:mysql
-      - ics-redis:redis
+
+
+
+  pig-auth:
     build:
       context: ./
       dockerfile: Dockerfile-auth
-    container_name: ics-auth
+    container_name: pig-auth
     restart: always
     ports:
       - 9060:9060
+    environment:
+          - RABBIT_MQ_HOST=rabbitmq
+          - RABBIT_MQ_PORT=5672
+          - RABBIT_MQ_USERNAME=guest
+          - RABBIT_MQ_PASSWORD=guest
+          - EUREKA_ZONE_HOST=discovery
+          - EUREKA_ZONE_PORT=1025
+          - REDIS_HOST=redis
+          - REDIS_PORT=6379
+          - REDIS_PASSWORD=123456
+          - MYSQL_HOST=mysql
+          - MYSQL_PORT=3306
+          - MYSQL_USERNAME=root
+          - MYSQL_PASSWORD=admin
+    depends_on:
+          - pig-eureka
+          - pig-mysql
+          - pig-redis
+          - pig-rabbitmq
     networks:
-      - ics-net
+      - pig-net
 
-  ics-site-service-provider:
-    links:
-      - ics-discovery-service:discovery
-      - ics-mysql:mysql
-      - ics-redis:redis
+  pig-upms:
     build:
       context: ./
-      dockerfile: Dockerfile-site
-    container_name: ics-site
+      dockerfile: Dockerfile-upms
+    container_name: pig-upms
     restart: always
     ports:
       - 8001:8001
-    networks:
-      - ics-net
+    environment:
+           - RABBIT_MQ_HOST=rabbitmq
+           - RABBIT_MQ_PORT=5672
+           - RABBIT_MQ_USERNAME=guest
+           - RABBIT_MQ_PASSWORD=guest
+           - EUREKA_ZONE_HOST=discovery
+           - EUREKA_ZONE_PORT=1025
+           - REDIS_HOST=redis
+           - REDIS_PORT=6379
+           - REDIS_PASSWORD=123456
+           - MYSQL_HOST=mysql
+           - MYSQL_PORT=3306
+           - MYSQL_USERNAME=root
+           - MYSQL_PASSWORD=admin
+    depends_on:
+           - pig-eureka
+           - pig-mysql
+           - pig-redis
+           - pig-rabbitmq
 
-  ics-edge-service:
-    links:
-      - ics-discovery-service:discovery
-      - ics-auth-service:auth
-    container_name: ics_gateway
+    networks:
+      - pig-net
+
+  pig-gateway:
+    container_name: pig_gateway
     build:
       context: ./
       dockerfile: Dockerfile-gateway
     ports:
       - 9030:9030
+    environment:
+        - RABBIT_MQ_HOST=rabbitmq
+        - RABBIT_MQ_PORT=5672
+        - RABBIT_MQ_USERNAME=guest
+        - RABBIT_MQ_PASSWORD=guest
+        - EUREKA_ZONE_HOST=discovery
+        - EUREKA_ZONE_PORT=1025
+        - REDIS_HOST=redis
+        - REDIS_PORT=6379
+        - REDIS_PASSWORD=123456
+        - MYSQL_HOST=mysql
+        - MYSQL_PORT=3306
+        - MYSQL_USERNAME=root
+        - MYSQL_PASSWORD=admin
+    depends_on:
+        - pig-eureka
+        - pig-mysql
+        - pig-redis
     networks:
-      - ics-net
-
-  ics-user-service:
-    links:
-      - ics-discovery-service:discovery
-      - ics-mysql:mysql
-    container_name: ics_user
-    build:
-      context: ./
-      dockerfile: Dockerfile-user
-    restart: always
-    ports:
-      - 8006:8006
-    networks:
-      - ics-net
+        - pig-net
 
 networks:
-  ics-net:
+  pig-net:
     driver: bridge
